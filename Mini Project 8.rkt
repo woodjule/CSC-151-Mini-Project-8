@@ -1,4 +1,6 @@
 #lang racket
+(require csc151)
+(require csc151/rex)
 
 #| STRUCTS FOR PARAGRAPHS, SENTENCES, WORDS, AND conjuclentionS |#
 
@@ -89,6 +91,31 @@
 ;;;    str : string?
 ;;; Converts a string to a word struct.
 ;;;  Assumes str contains one word
+
+
+;;; (string->words-list str) -> list? of string?
+;;;   str : string?
+;;; Creates a list of words represented by strings
+(define string->words-list
+  (let* ([rex-alphabetical (rex-any-of (rex-char-range #\a #\z)
+                                       (rex-char-range #\A #\Z))]
+         [rex-contractions (rex-concat (rex-repeat rex-alphabetical)
+                                       (rex-char-set "'")
+                                       (rex-repeat rex-alphabetical))])
+    (lambda (str)
+      (rex-find-matches (rex-any-of rex-contractions
+                                    (rex-repeat rex-alphabetical))
+                        str))))
+
+(test-equal? "Empty string"
+             (string->words "")
+             '(""))
+(test-equal? "Hyphens, Contractions, and Punctuation"
+             (string->words "Hello")
+             '("Hello"))
+(test-equal? "Hyphens, Contractions, and Punctuation"
+             (string->words "Test test-ing nope- -not don't 'try this' Punctuation? Not.Fun")
+             '("Test" "test" "ing" "nope" "not" "don't" "try" "this" "Punctuation" "Not" "Fun"))
 
 ;;; (string->sentence str) -> sentence?
 ;;;   str : string?
