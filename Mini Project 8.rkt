@@ -86,11 +86,18 @@
 ;;;  make it give a default value, such as clasifying all words as singular,
 ;;;  neuter, nominative nouns.
 ;;; TODO: Make this actually word (during part two)
+(define string->conjuclention
+  (lambda (str)
+    (declention 'singular 'neuter 'nominative)))
 
 ;;; (string->word str) -> word?
 ;;;    str : string?
 ;;; Converts a string to a word struct.
 ;;;  Assumes str contains one word
+(define string->word
+  (lambda (str)
+    (word str
+          (string->conjuclention str))))
 
 
 ;;; (string->words-list str) -> list? of string?
