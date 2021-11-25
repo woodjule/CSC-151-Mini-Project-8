@@ -1,16 +1,17 @@
 #lang racket
 (require csc151)
 (require csc151/rex)
+(require rackunit)
+(require rackunit/text-ui)
 
-#| STRUCTS FOR PARAGRAPHS, SENTENCES, WORDS, AND conjuclentionS |#
+#| STRUCTS FOR PARAGRAPHS, SENTENCES, WORDS, AND conjuclentions |#
 
 #| Paragraph Struct |#
 
 ;;; (paragraph sentences) -> paragraph?
 ;;;   sentences: list? of sentences?
 ;;; Struct for storing information about each paragraph
-
-
+(struct paragraph (sentences))
 
 
 #| Sentence Struct |#
@@ -18,7 +19,7 @@
 ;;; (sentence words) -> sentence?
 ;;;   words : list? of word?
 ;;; Struct for storing information about each sentence
-
+(struct sentence (words))
 
 
 
@@ -28,7 +29,7 @@
 ;;;   str : string?
 ;;;   conjuclention : conjuclention?
 ;;; Creates a word struct
-
+(struct word (str conjuclention))
 
 
 
@@ -40,7 +41,7 @@
 ;;;       (pronouns count as nouns)
 ;;;   conjucline : declention? or conjugation? or #f
 ;;; Stores information about a words part of speech and conjugation or declention
-
+(struct conjuclention (part-of-speech conjucline))
 
 
 
@@ -62,7 +63,7 @@
 ;;;   * Possessive case is used for possession
 ;;;     - "That's his cake."
 ;;;     - "That cake is his."
-
+(struct declention (number gender case))
 
 
 
@@ -73,7 +74,7 @@
 ;;;   number : 'singular or 'plural
 ;;;   tense : 'past or 'present
 ;;; Stores information about a verb's conjugation
-
+(struct conjugation (person number tense))
 
 
 
@@ -115,37 +116,119 @@
                         str))))
 
 (test-equal? "Empty string"
-             (string->words "")
-             '(""))
+             (string->words-list "")
+             '())
 (test-equal? "Hyphens, Contractions, and Punctuation"
-             (string->words "Hello")
+             (string->words-list "Hello")
              '("Hello"))
 (test-equal? "Hyphens, Contractions, and Punctuation"
-             (string->words "Test test-ing nope- -not don't 'try this' Punctuation? Not.Fun")
+             (string->words-list "Test test-ing nope- -not don't 'try this' Punctuation? Not.Fun")
              '("Test" "test" "ing" "nope" "not" "don't" "try" "this" "Punctuation" "Not" "Fun"))
+
+;;; (string->sentences-list str) -> list? of string?
+;;;   str : string?
+;;; Breaks apart a string into a list of sentences contained within the string
+;;; Includes the end punctuation with each sentence (including new line characters)
+;;; If str does not end in any punctuation, it treats the end of str as a new line character
+(define string->sentences-list
+  (lambda (str)
+    (let ([endmarks ".?\n"])
+      (rex-find-matches (rex-concat (rex-char-antiset (string-append endmarks
+                                                                     " \t\n\r"))
+                                    (rex-repeat (rex-char-antiset endmarks))
+                                    (rex-char-set endmarks))
+                        (string-append str
+                                       "\n")))))
+
+(test-equal? "string->sentences-list: Empty string"
+             (string->sentences-list "")
+             '())
+(test-equal? "string->sentences-list: Single sentence"
+             (string->sentences-list "Hello, how are you?")
+             '("Hello, how are you?"))
+(test-equal? "string->sentences-list: Multiple sentences"
+             (string->sentences-list "I'm doing good.  How about you?  Are you doing good?")
+             '("I'm doing good." "How about you?" "Are you doing good?"))
+(test-equal? "string->sentences-list: New line"
+             (string->sentences-list "First thing\nSecond thing\nThird thing")
+             '("First thing\n" "Second thing\n" "Third thing\n"))
+(test-equal? "string->sentences-list: Single sentence without punctuation"
+             (string->sentences-list "I'm going to test this sentence")
+             '("I'm going to test this sentence\n"))
+
+;;; (string->paragraph-list str) -> list-of-string?
+;;;    str : s(test-equal? "a singular paragraph"
+;;; breaks apart string into its paragraphs
+;;; if the strings ends without any new line it adds two new lines
+(define string->paragraph-list
+  (lambda (str)
+    (let* ([parsep1 "\n\n"]
+           [parsep2 "\n\t"]
+           [rex-letter (rex-repeat-0 (rex-char-antiset "\n"))])
+     (map string-trim (rex-find-matches (rex-concat rex-letter
+                                    (rex-any-of (rex-string "\n")
+                                                rex-letter)
+                                    (rex-repeat (rex-char-antiset parsep2))
+                                    (rex-any-of (rex-string parsep1)
+                                                (rex-string parsep2)))
+                        (string-append str
+                                       parsep1))))))
+
+(test-equal? "a singular paragraph"
+             (string->paragraph-list "i'm a little paragraph. ok.")
+             '("i'm a little paragraph. ok."))
+(test-equal? "multiple paragraphs"
+             (string->paragraph-list "i'm a little paragraph\n\n ok.\n\t I like cs.")
+             '("i'm a little paragraph" "ok." "I like cs."))
+(test-equal? "empty string"
+             (string->paragraph-list "")
+             '())
+(test-equal? "single tab"
+             (string->paragraph-list "I'm a little tea pot.\t short and stout")
+             '("I'm a little tea pot.\t short and stout"))
+(test-equal? "single new-line"
+             (string->paragraph-list "I'm a little tea pot.\n short and stout")
+             '("I'm a little tea pot.\n short and stout"))                                    
 
 ;;; (string->sentence str) -> sentence?
 ;;;   str : string?
 ;;; Converts a string into a sentence struct.
 ;;;  Assumes str contains one sentence
+(define string->sentence
+  (lambda (str)
+    (sentence (map string->word (string->words-list str)))))
 
 ;;; (string->paragraph str) -> paragraph?
 ;;;   str : string?
 ;;; Converts a string to a paragraph struct.
 ;;;  Assumes str contains only one paragraph.
+(define string->paragraph
+  (lambda (str)
+    (paragraph (map string->sentence (string->sentences-list str)))))
 
 ;;; (file->paragraph filename) -> paragraph?
 ;;;   filename : string? that is a valid text file name
 ;;; Converts the text in a document into a paragraph struct.
-;;;  Assumes str contains only one paragraph.
+;;;  Assumes file contains only one paragraph.
+(define file->paragraph
+  (lambda (filename)
+    (string->paragraph (file->string filename))))
 
 ;;; (string->paragraphs str) -> list? of paragraph?
 ;;;   str : string?
 ;;; Creates a list of paragraphs contained within the string
+(define string->paragraphs
+  (lambda (str)
+    (map paragraph (string->paragraph-list str))))
+
 
 ;;; (file->paragraphs filename) -> list? of paragraph?
 ;;;   filename : string? that is a valid text file name
 ;;; Creates a list of paragraphs contained within the given text document
+(define file->paragraphs
+  (lambda (filename)
+    (string->paragraphs (file->string filename))))
+
 
 #| WORD ANALYSIS |#
 
